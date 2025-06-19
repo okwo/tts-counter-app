@@ -1,45 +1,46 @@
-from flask import Flask, render_template, request, jsonify
-import json
-import os
+from flask import Flask, request, render_template, jsonify, session, url_for
+import os, uuid
 
 app = Flask(__name__)
-COUNTER_FILE = "counter.json"
+app.secret_key = 'secret_key'
 
-# โหลดข้อมูล counter หรือสร้างใหม่ถ้าไม่มี
-if not os.path.exists(COUNTER_FILE):
-    with open(COUNTER_FILE, "w") as f:
-        json.dump({"unique_ips": [], "convert_count": 0}, f)
+unique_users = set()
+total_converts = 0
 
-def load_counters():
-    with open(COUNTER_FILE, "r") as f:
-        return json.load(f)
-
-def save_counters(data):
-    with open(COUNTER_FILE, "w") as f:
-        json.dump(data, f)
-
-@app.route("/")
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    data = load_counters()
-    return render_template("index.html", users=len(data["unique_ips"]), converts=data["convert_count"])
+    global total_converts
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    unique_users.add(session['user_id'])
 
-@app.route("/convert", methods=["POST"])
-def convert():
-    user_ip = request.remote_addr
-    data = load_counters()
+    audio_url = None
+    if request.method == 'POST':
+        text = request.form.get('text', '').strip()
+        speed = request.form.get('speed', '1')
 
-    if user_ip not in data["unique_ips"]:
-        data["unique_ips"].append(user_ip)
-    data["convert_count"] += 1
-    save_counters(data)
+        if text:
+            total_converts += 1
 
-    # ส่งกลับค่าแบบ JSON
-    return jsonify(success=True)
+            # 🔧 แทรกรหัสแปลงข้อความเป็นเสียงจริงที่นี่
+            # ผลลัพธ์ควรคืนไฟล์ mp3 ใน static เช่น:
+            audio_filename = 'sample.mp3'
+            audio_url = url_for('static', filename=audio_filename)
 
-@app.route("/counter")
-def counter():
-    data = load_counters()
-    return jsonify(users=len(data["unique_ips"]), converts=data["convert_count"])
+    if request.is_json or request.method == 'POST':
+        return jsonify({
+            'users': len(unique_users),
+            'converts': total_converts,
+            'audio_url': audio_url
+        })
+
+    return render_template(
+        'index.html',
+        users=len(unique_users),
+        converts=total_converts
+    )
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
