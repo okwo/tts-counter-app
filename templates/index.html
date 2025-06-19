@@ -44,6 +44,18 @@
       margin-top: 15px;
       width: 100%;
     }
+    .stats {
+      margin-top: 20px;
+      background-color: #ffffff;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.1);
+    }
+    .stats span {
+      font-weight: bold;
+      color: #333;
+    }
     @media (max-width: 600px) {
       .controls {
         flex-direction: column;
@@ -55,12 +67,12 @@
   </style>
 </head>
 <body>
-<img src="/static/logo.png" alt="โลโก้ของเว็บ" style="width: 120px; display: block; margin: 0 auto 10px;">
+  <img src="/static/logo.png" alt="โลโก้ของเว็บ" style="width: 120px; display: block; margin: 0 auto 10px;">
   <h2>แปลงข้อความเป็นเสียง..ฟรี Version2.0</h2>
-
   <h4>พัฒนาโดย งานวิจัยและพัฒนาสื่อการศึกษา</h4>
   <br>
- <label for="text-input">ใส่ข้อความในกล่องด้านล่าง ไม่จำกัดจำนวนคำและจำนวนครั้ง:</label>
+
+  <label for="text-input">ใส่ข้อความในกล่องด้านล่าง ไม่จำกัดจำนวนคำและจำนวนครั้ง:</label>
   <br>
   <textarea id="text-input">สวัสดีค่ะ ยินดีต้อนรับสู่การแปลงข้อความเป็นเสียงภาษาไทยนะคะ</textarea>
 
@@ -79,6 +91,12 @@
 
   <div id="status"></div>
   <audio id="audio-player" controls></audio>
+
+  <!-- ✅ ส่วนแสดงสถิติ -->
+  <div class="stats">
+    👤 จำนวนผู้ใช้งานทั้งหมด: <span id="userCount">-</span><br>
+    🔁 จำนวนครั้งที่แปลงทั้งหมด: <span id="convertCount">-</span>
+  </div>
 
   <script>
     let audioBlobUrl = null;
@@ -117,6 +135,9 @@
         document.getElementById('play-btn').disabled = false;
         document.getElementById('download-btn').disabled = false;
 
+        // ✅ โหลดสถิติใหม่
+        updateStats();
+
       } catch (error) {
         statusEl.textContent = '❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
         statusEl.style.color = 'red';
@@ -141,6 +162,22 @@
         document.body.removeChild(a);
       }
     }
+
+    async function updateStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('userCount').textContent = data.user_count;
+          document.getElementById('convertCount').textContent = data.convert_count;
+        }
+      } catch (e) {
+        console.error('ไม่สามารถโหลดสถิติ:', e);
+      }
+    }
+
+    // เรียกครั้งแรกเมื่อโหลดหน้าเว็บ
+    updateStats();
   </script>
 
 </body>
