@@ -3,13 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <title>ระบบแปลงข้อความเป็นเสียง</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 0 10px; }
+    header { text-align: center; }
+    img.logo { max-width: 150px; margin-bottom: 10px; }
+    textarea { width: 100%; height: 120px; padding: 8px; font-size: 16px; }
+    .controls { margin: 10px 0; display: flex; gap: 10px; }
+    button, select { padding: 10px; font-size: 16px; cursor: pointer; }
+    audio { width: 100%; margin-top: 10px; }
+  </style>
 </head>
 <body>
-  <h1>ระบบแปลงข้อความเป็นเสียง</h1>
-  <p>จำนวนผู้ใช้งานไม่ซ้ำ: {{ users }}</p>
-  <p>จำนวนครั้งที่แปลงข้อความ: {{ converts }}</p>
-  <form method="POST">
-    <button type="submit">แปลงข้อความ</button>
+  <header>
+    <img class="logo" src="{{ url_for('static', filename='logo.png') }}" alt="โลโก้">
+    <h1>ระบบแปลงข้อความเป็นเสียง</h1>
+    <p>จำนวนผู้ใช้งาน: {{ users }} | จำนวนการแปลง: {{ converts }}</p>
+  </header>
+
+  <form id="tts-form" method="POST">
+    <textarea name="text" placeholder="พิมพ์ข้อความที่ต้องการแปลงเป็นเสียง..."></textarea>
+    <div class="controls">
+      <label for="speed">ความเร็ว:</label>
+      <select name="speed" id="speed">
+        <option value="0.75">ช้า (0.75x)</option>
+        <option value="1" selected>ปกติ (1x)</option>
+        <option value="1.25">เร็ว (1.25x)</option>
+        <option value="1.5">เร็วมาก (1.5x)</option>
+      </select>
+      <button type="submit">Convert</button>
+    </div>
   </form>
+
+  <div id="player" style="display:none">
+    <audio id="tts-audio" controls></audio>
+    <a id="download-btn" href="#" download="tts_output.mp3">ดาวน์โหลดเสียง</a>
+  </div>
+
+  <script>
+    const form = document.getElementById('tts-form');
+    const playerDiv = document.getElementById('player');
+    const audioEl = document.getElementById('tts-audio');
+    const downloadBtn = document.getElementById('download-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const resp = await fetch('/', { method: 'POST', body: formData });
+      const data = await resp.json();
+
+      if (data.audio_url) {
+        audioEl.src = data.audio_url;
+        downloadBtn.href = data.audio_url;
+        playerDiv.style.display = 'block';
+      } else {
+        alert('เกิดข้อผิดพลาดขณะแปลงเสียง');
+      }
+    });
+  </script>
 </body>
 </html>
