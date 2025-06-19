@@ -1,6 +1,7 @@
 services:
   - type: web
-    name: tts-counter-app
+    name: tts-api
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python app.py"
+    plan: free
