@@ -1,46 +1,44 @@
-from flask import Flask, request, render_template, jsonify, session, url_for
-import os, uuid
+from flask import Flask, render_template, request, send_from_directory
+from google.cloud import texttospeech
+import os
+import uuid
 
 app = Flask(__name__)
-app.secret_key = 'secret_key'
+AUDIO_DIR = "static/audio"
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
-unique_users = set()
-total_converts = 0
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/")
 def index():
-    global total_converts
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
-    unique_users.add(session['user_id'])
+    return render_template("index.html")
 
-    audio_url = None
-    if request.method == 'POST':
-        text = request.form.get('text', '').strip()
-        speed = request.form.get('speed', '1')
+@app.route("/convert", methods=["POST"])
+def convert():
+    text = request.form["text"]
+    speed = float(request.form["speed"])
 
-        if text:
-            total_converts += 1
+    filename = f"{uuid.uuid4()}.wav"
+    filepath = os.path.join(AUDIO_DIR, filename)
 
-            # 🔧 แทรกรหัสแปลงข้อความเป็นเสียงจริงที่นี่
-            # ผลลัพธ์ควรคืนไฟล์ mp3 ใน static เช่น:
-            audio_filename = 'sample.mp3'
-            audio_url = url_for('static', filename=audio_filename)
+    # === Google TTS ===
+    client = texttospeech.TextToSpeechClient()
+    synthesis_input = texttospeech.SynthesisInput(text=text)
 
-    if request.is_json or request.method == 'POST':
-        return jsonify({
-            'users': len(unique_users),
-            'converts': total_converts,
-            'audio_url': audio_url
-        })
-
-    return render_template(
-        'index.html',
-        users=len(unique_users),
-        converts=total_converts
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="th-TH",
+        ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
     )
 
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+        speaking_rate=speed
+    )
+
+    response = client.synthesize_speech(
+        input=synthesis_input, voice=voice, audio_config=audio_config
+    )
+
+    with open(filepath, "wb") as out:
+        out.write(response.audio_content)
+
+    return render_template("index.html", audio_url=f"/{filepath}")
+
