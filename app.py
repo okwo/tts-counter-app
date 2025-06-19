@@ -1,44 +1,38 @@
-from flask import Flask, render_template, request, send_from_directory
-from google.cloud import texttospeech
-import os
-import uuid
+from flask import Flask, request, send_file, render_template
+from flask_cors import CORS
+from gtts import gTTS
+import tempfile, os, subprocess
 
 app = Flask(__name__)
-AUDIO_DIR = "static/audio"
-os.makedirs(AUDIO_DIR, exist_ok=True)
+CORS(app)
 
 @app.route("/")
-def index():
+def home():
     return render_template("index.html")
 
-@app.route("/convert", methods=["POST"])
+@app.route("/api/convert", methods=["POST"])
 def convert():
-    text = request.form["text"]
-    speed = float(request.form["speed"])
+    data = request.get_json()
+    text = data.get("text", "")
+    speed = float(data.get("speed", 1.0))
 
-    filename = f"{uuid.uuid4()}.wav"
-    filepath = os.path.join(AUDIO_DIR, filename)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tts_path = os.path.join(tmpdir, "tts.mp3")
+        wav_path = os.path.join(tmpdir, "tts.wav")
+        output_path = os.path.join(tmpdir, "output.wav")
 
-    # === Google TTS ===
-    client = texttospeech.TextToSpeechClient()
-    synthesis_input = texttospeech.SynthesisInput(text=text)
+        tts = gTTS(text=text, lang="th")
+        tts.save(tts_path)
 
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="th-TH",
-        ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
-    )
+        subprocess.run(["ffmpeg", "-y", "-i", tts_path, wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.LINEAR16,
-        speaking_rate=speed
-    )
+        if speed == 1.0:
+            os.rename(wav_path, output_path)
+        else:
+            subprocess.run(["ffmpeg", "-y", "-i", wav_path, "-filter:a", f"atempo={speed}", output_path],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    response = client.synthesize_speech(
-        input=synthesis_input, voice=voice, audio_config=audio_config
-    )
+        return send_file(output_path, mimetype="audio/wav")
 
-    with open(filepath, "wb") as out:
-        out.write(response.audio_content)
-
-    return render_template("index.html", audio_url=f"/{filepath}")
-
+if __name__ == "__main__":
+    app.run()
