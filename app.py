@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, render_template, session, jsonify
+from flask import Flask, request, send_file, render_template, session, jsonify, Response
 from flask_cors import CORS
 from flask_session import Session
 from gtts import gTTS
@@ -52,14 +52,13 @@ def convert():
             subprocess.run(["ffmpeg", "-y", "-i", wav_path, "-filter:a", f"atempo={speed}", output_path],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # ส่งไฟล์พร้อมข้อมูลจำนวน
-        return send_file(output_path, mimetype="audio/wav",
-                         as_attachment=False,
-                         download_name="output.wav",
-                         headers={
-                             "X-Convert-Count": str(convert_count),
-                             "X-User-Count": str(len(unique_users))
-                         })
+        # สร้าง response และตั้ง header แบบ manual
+        response = send_file(output_path, mimetype="audio/wav",
+                             as_attachment=False,
+                             download_name="output.wav")
+        response.headers["X-Convert-Count"] = str(convert_count)
+        response.headers["X-User-Count"] = str(len(unique_users))
+        return response
 
 @app.route("/api/stats", methods=["GET"])
 def get_stats():
