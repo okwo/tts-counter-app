@@ -2,33 +2,147 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>Text to Speech App</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text to Speech Converter</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #f0f4f8;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      font-size: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .controls {
+      margin-top: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    select, button {
+      font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 5px;
+      border: 1px solid #888;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    audio {
+      display: block;
+      margin-top: 15px;
+      width: 100%;
+    }
+    @media (max-width: 600px) {
+      .controls {
+        flex-direction: column;
+      }
+      select, button {
+        width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <img src="/static/logo.png" alt="Logo" style="height: 100px;">
+<img src="/static/logo.png" alt="โลโก้ของเว็บ" style="width: 120px; display: block; margin: 0 auto 10px;">
+  <h2>แปลงข้อความเป็นเสียง Version1.0</h2>
 
-    <h1>แปลงข้อความเป็นเสียง</h1>
+  <h3>พัฒนาโดย งานวิจัยและพัฒนาสื่อการศึกษา</h3>
+  <br>
+ <label for="text-input">ใส่ข้อความในกล่องด้านล่าง ไม่จำกัดจำนวนคำ:</label>
+  <br>
+  <textarea id="text-input">สวัสดีค่ะ ยินดีต้อนรับสู่การแปลงข้อความเป็นเสียงนะคะ</textarea>
 
-    <form action="/convert" method="POST">
-      <textarea name="text" rows="5" placeholder="พิมพ์ข้อความที่นี่..." required></textarea><br>
-      
-      <label for="speed">เลือกความเร็ว:</label>
-      <select name="speed" id="speed">
-        <option value="0.8">ช้า</option>
-        <option value="1.0" selected>ปกติ</option>
-        <option value="1.2">เร็ว</option>
-      </select><br><br>
+  <div class="controls">
+    <label for="speed-select">เลือกความเร็ว:</label>
+    <select id="speed-select">
+      <option value="1.2">1.0x</option>
+      <option value="1.3">1.2x</option>
+      <option value="1.32">1.3x</option>
+      <option value="1.5">1.4x</option>
+    </select>
 
-      <button type="submit">แปลงข้อความ</button>
-    </form>
-
-    {% if audio_url %}
-      <h2>ผลลัพธ์</h2>
-      <audio controls src="{{ audio_url }}"></audio><br>
-      <a href="{{ audio_url }}" download>ดาวน์โหลดไฟล์เสียง</a>
-    {% endif %}
+    <button onclick="convertText()">Convert</button>
+    <button onclick="playAudio()" disabled id="play-btn">เล่นเสียง</button>
+    <button onclick="downloadAudio()" disabled id="download-btn">ดาวน์โหลด</button>
   </div>
+
+  <div id="status"></div>
+  <audio id="audio-player" controls></audio>
+
+  <script>
+    let audioBlobUrl = null;
+
+    async function convertText() {
+      const text = document.getElementById('text-input').value;
+      const speed = parseFloat(document.getElementById('speed-select').value);
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = 'กำลังแปลงเสียง...';
+      statusEl.style.color = 'green';
+
+      try {
+        const response = await fetch('/api/convert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text, speed })
+        });
+
+        if (!response.ok) {
+          statusEl.textContent = '❌ เกิดข้อผิดพลาดในการแปลงเสียง';
+          statusEl.style.color = 'red';
+          return;
+        }
+
+        const blob = await response.blob();
+        audioBlobUrl = URL.createObjectURL(blob);
+
+        const audio = document.getElementById('audio-player');
+        audio.src = audioBlobUrl;
+
+        statusEl.textContent = '✅ แปลงไฟล์สำเร็จ';
+        statusEl.style.color = 'blue';
+
+        document.getElementById('play-btn').disabled = false;
+        document.getElementById('download-btn').disabled = false;
+
+      } catch (error) {
+        statusEl.textContent = '❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+        statusEl.style.color = 'red';
+        console.error(error);
+      }
+    }
+
+    function playAudio() {
+      const audio = document.getElementById('audio-player');
+      if (audioBlobUrl) {
+        audio.play();
+      }
+    }
+
+    function downloadAudio() {
+      if (audioBlobUrl) {
+        const a = document.createElement('a');
+        a.href = audioBlobUrl;
+        a.download = 'output.wav';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    }
+  </script>
+
 </body>
 </html>
