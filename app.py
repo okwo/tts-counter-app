@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, render_template, session, jsonify, Response
+from flask import Flask, request, send_file, render_template, session, jsonify
 from flask_cors import CORS
 from flask_session import Session
 from gtts import gTTS
@@ -16,15 +16,31 @@ Session(app)
 unique_users = set()
 convert_count = 0
 
+# ฟังก์ชันปรับเสียงด้วย ffmpeg
+def adjust_audio_style(input_path, output_path, style):
+    filters = {
+        "normal": None,
+        "fast": "atempo=1.3",
+        "slow": "atempo=0.8",
+        "child": "atempo=1.1,asetrate=44100*1.05",
+        "deep": "atempo=0.9,asetrate=44100*0.95"
+    }
+    selected_filter = filters.get(style)
+
+    if selected_filter:
+        subprocess.run(["ffmpeg", "-y", "-i", input_path, "-filter:a", selected_filter, output_path],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        os.rename(input_path, output_path)
+
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("index.html")  # ต้องมี templates/index.html
 
 @app.route("/api/convert", methods=["POST"])
 def convert():
     global convert_count, unique_users
 
-    # ตรวจสอบว่าเป็นผู้ใช้ใหม่หรือไม่
     if "user_id" not in session:
         session["user_id"] = str(uuid.uuid4())
         unique_users.add(session["user_id"])
@@ -33,26 +49,25 @@ def convert():
 
     data = request.get_json()
     text = data.get("text", "")
-    speed = float(data.get("speed", 1.0))
+    style = data.get("style", "normal")  # รับค่าจากหน้าเว็บ
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tts_path = os.path.join(tmpdir, "tts.mp3")
         wav_path = os.path.join(tmpdir, "tts.wav")
         output_path = os.path.join(tmpdir, "output.wav")
 
+        # สร้างเสียงด้วย gTTS
         tts = gTTS(text=text, lang="th")
         tts.save(tts_path)
 
+        # แปลง mp3 เป็น wav
         subprocess.run(["ffmpeg", "-y", "-i", tts_path, wav_path],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if speed == 1.0:
-            os.rename(wav_path, output_path)
-        else:
-            subprocess.run(["ffmpeg", "-y", "-i", wav_path, "-filter:a", f"atempo={speed}", output_path],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # ปรับเสียงตาม style
+        adjust_audio_style(wav_path, output_path, style)
 
-        # สร้าง response และตั้ง header แบบ manual
+        # ส่งเสียงกลับ
         response = send_file(output_path, mimetype="audio/wav",
                              as_attachment=False,
                              download_name="output.wav")
